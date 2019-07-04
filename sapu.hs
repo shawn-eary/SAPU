@@ -83,6 +83,14 @@
 -- July 13, 2010
 -- [Last Accessed: July 1, 2019]
 --
+-- [4] - ocharles; Joiner, Matt; et al...
+-- Convert a Lazy ByteString to a strict ByteString
+-- StackOverflow
+-- https://stackoverflow.com/questions/7815402/
+-- convert-a-lazy-bytestring-to-a-strict-bytestring
+-- November 29, 2012
+-- [Last Accessed: July 4, 2019]
+--
 -- GENERAL REFERECES:
 -- The referneces in listed in this section were overarching and
 -- general.  They were used so frequently that it doesn't make sense to
@@ -240,18 +248,16 @@ runMainMenu inMemoryDecripKey = do
     let tKey = getTotalKey inMemoryDecripKey theLine
     -- putStrLn tKey
     putStrLn "Enter Description Identifier:"
-    theDescription <- getLine;
+    theDescription <- getLine
     putStrLn "Enter Password:"
-    -- Can't get this working right now [1]
-    -- thePassword <- getPassword (Just '*') "pass:"
-    -- thePassword <- getLine;
-    bPass <- BStr.getLine
+    sPass <- getSecret
+    -- bPass <- BStr.getLine
+    -- You can see [3] and [4] for how to convert a string into a
+    -- Lazy ByteString
+    let bPass = UTF8.fromString sPass
     let blPass = BL.fromStrict bPass
     LChar8.putStrLn blPass
     let bTkey = UTF8.fromString tKey
-    -- let blTkey = BL.fromStrict bTkey
-    -- let bPassword = UTF8.fromString thePassword
-    -- let blPassword = BL.fromStrict bPassword
     encryptedPassword <- encryptMsg CBC bTkey blPass
     -- LChar8.putStrLn encryptedPassword
     let encodedEncryptedPassword = B64L.encode encryptedPassword
