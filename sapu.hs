@@ -245,7 +245,6 @@ showMainMenu = do
 
 runMainMenu :: String -> IO ()
 runMainMenu inMemoryDecripKey = do
-  -- putStrLn inMemoryDecripKey;
   showMainMenu;
   menuChoice <- getLine     -- GetChar was leaving junk at the end
   if menuChoice == "x" then
@@ -261,7 +260,6 @@ runMainMenu inMemoryDecripKey = do
     theLine <- hGetLine theHandle
     hClose theHandle
     let tKey = getTotalKey inMemoryDecripKey theLine
-    -- putStrLn tKey
     putStrLn "Enter Description Identifier:"
     theDescription <- getLine
     putStrLn "Enter Password:"
@@ -272,14 +270,8 @@ runMainMenu inMemoryDecripKey = do
     let blPass = stringToLazyByteString sPass
     let bTkey = UTF8.fromString tKey
     encryptedPassword <- encryptMsg CBC bTkey blPass
-    -- LChar8.putStrLn encryptedPassword
     let encodedEncryptedPassword = B64L.encode encryptedPassword
-    -- LChar8.putStrLn encodedEncryptedPassword
     let decryptedPassword = decryptMsg CBC bTkey encryptedPassword
-    -- LChar8.putStrLn decryptedPassword 
-    -- let strict = BL.toStrict encryptedPassword
-    -- let epString = UTF8.toString strict
-    -- putStrLn epString
     writePass theDescription encodedEncryptedPassword
     runMainMenu inMemoryDecripKey
   else if menuChoice == "g" then do
@@ -289,16 +281,15 @@ runMainMenu inMemoryDecripKey = do
     hClose theHandle
     let tKey = getTotalKey inMemoryDecripKey theLine
     let bTkey = UTF8.fromString tKey
-    -- putStrLn tKey
     putStrLn "Enter Description Identifier:"
     theDescription <- getLine
     theEncryptedPass <- getPasswordFromSAPU tKey theDescription
-    -- Converting a String to a ByteSTring according to [3]
+
+    -- Converting a String to a ByteString according to [3]
     let bEncodedEncryptedPass = UTF8.fromString theEncryptedPass
     let bEncryptedPass = B64.decodeLenient bEncodedEncryptedPass
-    let outString = "pass: " ++ theEncryptedPass
-
-    let decryptedPassword = decryptMsg CBC bTkey (LChar8.fromStrict bEncryptedPass)
+    let lbsEncryptedPass = LChar8.fromStrict bEncryptedPass;
+    let decryptedPassword = decryptMsg CBC bTkey lbsEncryptedPass;
 
     -- Actually, I should maybe be copying the password to the clipboard
     -- so it isn't seen but I will need to get to that later
@@ -309,5 +300,5 @@ runMainMenu inMemoryDecripKey = do
 
 main :: IO ()
 main = do
-  setClipboardString "Something Else";
+  -- setClipboardString "Something Else";
   runMainMenu "";
