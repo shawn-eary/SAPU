@@ -112,7 +112,7 @@
 -- Euclidean Space
 -- https://www.euclideanspace.com/
 -- software/language/functional/haskell/operators/index.htm
--- [Last Referenced: June 30, 2019]
+-- [Last Referenced: July 4, 2019]
 --
 -- [C] - Various
 -- Hackage
@@ -147,6 +147,49 @@ import Codec.Crypto.SimpleAES;
 -- Hardcoded for now
 thePasswordFile = "samplePassFile";
 splitToken = " :%: "
+
+
+
+-- PURPOSE:
+--   To determine if thePassPhrase is valid
+--
+-- thePassPhrase:
+--   The pass phrase to check for validity
+--
+-- RETURNS:
+--   True if thePassPhrase is thought to be valid and false it it is
+--   deemed to be invalid
+--   [Presently, the check for the validity of the pass phrase is
+--    quite limited.  This isn't a security risk but it's a
+---   nuisance because it will cause the encryption and decryption
+--    to yield incorrect/garbled results.  Under the current
+--    design (which will be eventually fixed) if the user enters
+--    a bad passphrase, she/he will have to restart the application]
+passPhraseIsValid :: String -> Bool
+passPhraseIsValid thePassPhrase =
+  (thePassPhrase /= "")
+
+
+
+-- PURPOSE:
+--   Runs until curPassPhrase is determined to be valid
+--
+-- curPassPhrase:
+--   The pass phrase to check for validity
+--
+-- RETURNS:
+--   What is *thought* to be a valid pass phrase
+--   [See comment on passPhraseIsValid Function ]
+getUpdatedPassPhrase :: String -> IO String
+getUpdatedPassPhrase curPassPhrase = do
+  if passPhraseIsValid curPassPhrase then
+    return curPassPhrase
+  else do
+    putStrLn "Enter the Passphrase Below:"
+    let outString = "[Until I fix the padding issue, just use three alphanumeric ASCII Characters]"
+    putStrLn outString
+    passPhrase <- getSecret
+    getUpdatedPassPhrase passPhrase
 
 
 
@@ -253,7 +296,6 @@ getTotalKey inMemoryKey fromFileKey =
 showMainMenu :: IO ()
 showMainMenu = do
   putStrLn "";
-  putStrLn "s - Set InMemory Key";
   putStrLn "n - New Password Mode";
   putStrLn "g - Get Password Mode";
   putStrLn "x - Exit";
@@ -270,11 +312,12 @@ runMainMenu inMemoryDecripKey = do
     inMemoryKey <- getSecret
     runMainMenu inMemoryKey
   else if menuChoice == "n" then do
+    passPhrase <- getUpdatedPassPhrase inMemoryDecripKey
     -- Location of extraKeyFile is hardcoded for now
     theHandle <- openFile "extraKeyFile" ReadMode
     theLine <- hGetLine theHandle
     hClose theHandle
-    let tKey = getTotalKey inMemoryDecripKey theLine
+    let tKey = getTotalKey passPhrase theLine
     putStrLn "Enter Description Identifier:"
     theDescription <- getLine
     putStrLn "Enter Password:"
@@ -288,13 +331,14 @@ runMainMenu inMemoryDecripKey = do
     let encodedEncryptedPassword = B64L.encode encryptedPassword
     let decryptedPassword = decryptMsg CBC bTkey encryptedPassword
     writePass theDescription encodedEncryptedPassword
-    runMainMenu inMemoryDecripKey
+    runMainMenu passPhrase
   else if menuChoice == "g" then do
+    passPhrase <- getUpdatedPassPhrase inMemoryDecripKey
     -- Location of extraKeyFile is hardcoded for now
     theHandle <- openFile "extraKeyFile" ReadMode
     theLine <- hGetLine theHandle
     hClose theHandle
-    let tKey = getTotalKey inMemoryDecripKey theLine
+    let tKey = getTotalKey passPhrase theLine
     let bTkey = UTF8.fromString tKey
     putStrLn "Enter Description Identifier:"
     theDescription <- getLine
@@ -313,7 +357,7 @@ runMainMenu inMemoryDecripKey = do
     -- LChar8.putStrLn decryptedPassword
     let sDecryptedPassword = lazyByteStringToString decryptedPassword
     setClipboardString sDecryptedPassword
-    runMainMenu inMemoryDecripKey
+    runMainMenu passPhrase
   else
     runMainMenu inMemoryDecripKey
 
