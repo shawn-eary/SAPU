@@ -106,6 +106,11 @@
 -- software/language/functional/haskell/operators/index.htm
 -- [Last Referenced: June 30, 2019]
 --
+-- [C] - Various
+-- Hackage
+-- https://hackage.haskell.org/
+-- [Last Referenced: July 3, 2019]
+--
 -- REFERNCE APPOLOGY:
 -- While I would like for this to be an academic work, it is not
 -- one.  This code is written in haste because I have a day job.
@@ -114,7 +119,8 @@
 -- I will try to correct the situation when I become aware.  Also,
 -- things that are common knowlege are not required to be cited, but
 -- with me being a paranoid person, I tend to cite whenever I get
--- help 
+-- help
+import Data.Maybe
 import System.IO;
 import System.Clipboard;
 import System.Console.Haskeline;
@@ -130,11 +136,29 @@ import qualified Data.ByteString.Base64 as B64;
 -- and I'm trying to get this out the door.  I will fix it later
 import Codec.Crypto.SimpleAES;
 
-
-
 -- Hardcoded for now
 thePasswordFile = "samplePassFile";
 splitToken = " :%: "
+
+
+
+-- PURPOSE:
+--   Per [1], uses the getPassword function of the Haskeline package
+--   to read sensitive information from the command line.  As mentioned
+--   in [1], the getPassword takes a character as a parmeter that will
+--   be used to display inplace of the password characters.  The
+--   getPassword form Haskeline is useful if you want to obscure the
+--   typed in text from shoulder surfers
+--
+-- RETURNS:
+--   An IO String action representing the sensitive information.
+--   In many cases this will just be a password string
+getSecret :: IO String
+getSecret = do
+  theSecret <- runInputT defaultSettings (getPassword (Just '*') "pass:")
+  return (fromJust theSecret)
+
+
 
 -- This actually isn't implemented correctly since splitToken
 -- may appear again later on the line but it's probably good
@@ -206,9 +230,7 @@ runMainMenu inMemoryDecripKey = do
   else if menuChoice == "s" then do
     putStrLn "Enter the inMemory Crypto Key Below:"
     putStrLn "[Until I fix the padding issue, just use three alphanumeric ASCII Characters]"
-    -- Can't get this working right now [1]
-    -- inMemoryKey <- getPassword (Just '*') "pass:"
-    inMemoryKey <- getLine
+    inMemoryKey <- getSecret
     runMainMenu inMemoryKey
   else if menuChoice == "n" then do
     -- Location of extraKeyFile is hardcoded for now
