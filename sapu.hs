@@ -76,7 +76,7 @@
 -- [Last Accessed: June 30, 2019]
 --
 -- [3] - Peacker; Eding, Thomas; et al...
--- What is the Best Way to Convert STring to ByteString
+-- What is the Best Way to Convert String to ByteString
 -- StackOverflow
 -- https://stackoverflow.com/questions/3232074/
 -- what-is-the-best-way-to-convert-string-to-bytestring
@@ -162,6 +162,21 @@ stringToLazyByteString :: String -> BL.ByteString
 stringToLazyByteString s = do
   let byteString = UTF8.fromString s
   BL.fromStrict byteString
+
+
+
+-- PURPOSE:
+--   Per [3] and [4], converts a Lazy ByteString to an ordinary String
+--
+-- lbs:
+--   The Lazy ByteString to convert to a String
+--
+-- RETURNS:
+--   A String representing lbs
+lazyByteStringToString :: BL.ByteString -> String
+lazyByteStringToString lbs = do
+  let strictByteString = BL.toStrict lbs
+  UTF8.toString strictByteString
 
 
 
@@ -291,14 +306,20 @@ runMainMenu inMemoryDecripKey = do
     let lbsEncryptedPass = LChar8.fromStrict bEncryptedPass;
     let decryptedPassword = decryptMsg CBC bTkey lbsEncryptedPass;
 
-    -- Actually, I should maybe be copying the password to the clipboard
-    -- so it isn't seen but I will need to get to that later
-    LChar8.putStrLn decryptedPassword
+    -- In the future, the user might be given the option to choose
+    -- whether she or he wants to print the password to the console
+    -- or copy it to the clipboard, but right now just copy it to
+    -- the clipboard
+    -- LChar8.putStrLn decryptedPassword
+    let sDecryptedPassword = lazyByteStringToString decryptedPassword
+    setClipboardString sDecryptedPassword
     runMainMenu inMemoryDecripKey
   else
     runMainMenu inMemoryDecripKey
 
 main :: IO ()
 main = do
-  -- setClipboardString "Something Else";
+  -- The inMemory Crypto Key is passed recursively on the Stack to
+  -- main menu to preserve its state.  When this program is first
+  -- started, that value has not been specified so we pass in ""
   runMainMenu "";
