@@ -151,6 +151,21 @@ splitToken = " :%: "
 
 
 -- PURPOSE:
+--   Per [3] and [4], converts and ordinary string to a Lazy ByteString
+--
+-- s:
+--   The String to convert to a Lazy ByteString
+--
+-- RETURNS:
+--   A Lazy ByteString representing s
+stringToLazyByteString :: String -> BL.ByteString
+stringToLazyByteString s = do
+  let byteString = UTF8.fromString s
+  BL.fromStrict byteString
+
+
+
+-- PURPOSE:
 --   Per [1], uses the getPassword function of the Haskeline package
 --   to read sensitive information from the command line.  As mentioned
 --   in [1], the getPassword takes a character as a parmeter that will
@@ -251,12 +266,10 @@ runMainMenu inMemoryDecripKey = do
     theDescription <- getLine
     putStrLn "Enter Password:"
     sPass <- getSecret
-    -- bPass <- BStr.getLine
+
     -- You can see [3] and [4] for how to convert a string into a
     -- Lazy ByteString
-    let bPass = UTF8.fromString sPass
-    let blPass = BL.fromStrict bPass
-    LChar8.putStrLn blPass
+    let blPass = stringToLazyByteString sPass
     let bTkey = UTF8.fromString tKey
     encryptedPassword <- encryptMsg CBC bTkey blPass
     -- LChar8.putStrLn encryptedPassword
