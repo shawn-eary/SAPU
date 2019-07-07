@@ -172,24 +172,34 @@ passPhraseIsValid thePassPhrase =
 
 
 -- PURPOSE:
---   Runs until curPassPhrase is determined to be valid
+--   Runs until curPassPhrase is determined to be valid via
+--   validationFunc
 --
 -- curPassPhrase:
 --   The pass phrase to check for validity
 --
+-- validationFunc:
+--   The function that verifies curPassPhrase
+--   Validation Func must accept a string as input and return a true
+--   or false value indicating if the input string is a valid
+--   passPhrase.  The idea is that validationFunc can be changed in the
+--   future to match the desired context
+--
+-- message:
+--   The message to display when prompting for a passPhrase
+--
 -- RETURNS:
---   What is *thought* to be a valid pass phrase
---   [See comment on passPhraseIsValid Function ]
-getUpdatedPassPhrase :: String -> IO String
-getUpdatedPassPhrase curPassPhrase = do
-  if passPhraseIsValid curPassPhrase then
+--   A valid passPhrase according to validationFunc
+getUpdatedPassPhrase :: String -> (String -> Bool) -> String -> IO String
+getUpdatedPassPhrase curPassPhrase validationFunc message = do
+  if validationFunc curPassPhrase then
     return curPassPhrase
   else do
-    putStrLn "Enter the Passphrase Below:"
+    putStrLn message
     let outString = "[Until I fix the padding issue, just use three alphanumeric ASCII Characters]"
     putStrLn outString
     passPhrase <- getSecret
-    getUpdatedPassPhrase passPhrase
+    getUpdatedPassPhrase passPhrase validationFunc message
 
 
 
@@ -306,13 +316,9 @@ runMainMenu inMemoryDecripKey = do
   menuChoice <- getLine     -- GetChar was leaving junk at the end
   if menuChoice == "x" then
     putStrLn "Terminating"
-  else if menuChoice == "s" then do
-    putStrLn "Enter the inMemory Crypto Key Below:"
-    putStrLn "[Until I fix the padding issue, just use three alphanumeric ASCII Characters]"
-    inMemoryKey <- getSecret
-    runMainMenu inMemoryKey
   else if menuChoice == "n" then do
-    passPhrase <- getUpdatedPassPhrase inMemoryDecripKey
+    passPhrase <- getUpdatedPassPhrase
+      inMemoryDecripKey passPhraseIsValid "Enter Passphrase:"
     -- Location of extraKeyFile is hardcoded for now
     theHandle <- openFile "extraKeyFile" ReadMode
     theLine <- hGetLine theHandle
@@ -333,7 +339,8 @@ runMainMenu inMemoryDecripKey = do
     writePass theDescription encodedEncryptedPassword
     runMainMenu passPhrase
   else if menuChoice == "g" then do
-    passPhrase <- getUpdatedPassPhrase inMemoryDecripKey
+    passPhrase <- getUpdatedPassPhrase
+      inMemoryDecripKey passPhraseIsValid "Enter Passphrase:"
     -- Location of extraKeyFile is hardcoded for now
     theHandle <- openFile "extraKeyFile" ReadMode
     theLine <- hGetLine theHandle
