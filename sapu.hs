@@ -1,15 +1,15 @@
 -- Copyright (c) 2019 Shawn Eary
--- 
+--
 -- Permission is hereby granted, free of charge, to any person obtaining a copy
 -- of this software and associated documentation files (the "Software"), to deal
 -- in the Software without restriction, including without limitation the rights
 -- to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 -- copies of the Software, and to permit persons to whom the Software is
 -- furnished to do so, subject to the following conditions:
--- 
+--
 -- The above copyright notice and this permission notice shall be included in all
 -- copies or substantial portions of the Software.
--- 
+--
 -- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 -- IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 -- FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -20,7 +20,7 @@
 --
 --
 -- SAPU - Shawn's Aweful Password Utility
--- 
+--
 -- SAPU is Licensed via the MIT License (See Above)
 --
 -- This is a password manager and it is in the alpha stage.  You are
@@ -36,12 +36,12 @@
 --
 --       1         2         3         4         5         6         7
 -- 456789012345678901234567890123456789012345678901234567890123456789012
--- 
+--
 -- This program uses the following Haskell Packages clipboard, split,
 -- haskeline and cryptonite.  You will need to install them before
 -- compiling this one file program.
 --
--- EASY COMPILATION STEPS:
+-- APPROXIMATE COMPILATION STEPS for MS Windows:
 -- cabal install clipboard
 -- cabal install haskeline
 -- NOT Used Right now - Want to use in future-- cabal install cryptonite
@@ -91,6 +91,14 @@
 -- November 29, 2012
 -- [Last Accessed: July 4, 2019]
 --
+-- [5] - Burton, Kyle; Seymour, Chris
+-- Haskell Output a List of ASCII Value
+-- StackOverflow
+-- https://stackoverflow.com/questions/13665796/
+-- haskell-output-a-list-of-ascii-value
+-- December 2, 2012
+-- [Last Accessed: July 17, 2019]
+--
 -- GENERAL REFERECES:
 -- The referneces in listed in this section were overarching and
 -- general.  They were used so frequently that it doesn't make sense to
@@ -119,6 +127,11 @@
 -- https://hackage.haskell.org/
 -- [Last Referenced: July 3, 2019]
 --
+-- [D] - Various
+-- Hoogλe
+-- https://hoogle.haskell.org
+-- [Last Referenced: July 17, 2019]
+--
 -- REFERNCE APPOLOGY:
 -- While I would like for this to be an academic work, it is not
 -- one.  This code is written in haste because I have a day job.
@@ -128,6 +141,7 @@
 -- things that are common knowlege are not required to be cited, but
 -- with me being a paranoid person, I tend to cite whenever I get
 -- help
+import Data.Char
 import Data.Maybe
 import System.IO;
 import System.Clipboard;
@@ -139,14 +153,56 @@ import qualified Data.ByteString as BStr;
 import qualified Data.ByteString.Lazy.Char8 as LChar8;
 import qualified Data.ByteString.Base64.Lazy as B64L;
 import qualified Data.ByteString.Base64 as B64;
+import System.Random;
 
 -- I wanted to use Cryptonite but I don't understand it right now
 -- and I'm trying to get this out the door.  I will fix it later
 import Codec.Crypto.SimpleAES;
 
--- Hardcoded for now
-thePasswordFile = "samplePassFile";
+
+
+-- Contstants
 splitToken = " :%: "
+cryptoKeyLength = 32
+extraKeyFile = "extraKeyFile"
+
+-- The number of alphanumeric characters should be
+-- 26 a-z + 26 A-Z + 10 for 0-9
+alphaNumericExtent = (26 * 2) + 10
+
+-- Hardcoded for now
+thePasswordFile = "samplePassFile"
+
+
+
+-- PURPOSE:
+--   To indicated if the String s contains only ASCII alphanumeric
+--   character
+--   (There is a bug in this function.  It can't be used right now)s
+--
+-- s:
+--   The string to examine
+--
+-- RETURNS:
+--   True if the String s contains only alphanumeric characters from
+--   the ASCII set
+--   (There is a bug in this function.  It can't be used right now)
+isAlphaNumClean :: String -> Bool
+isAlphaNumClean s = do
+  if s == "" then
+    -- I know this is probably "techically" wrong
+    -- but it is convienent for the purposes of
+    -- recursion to assume that all empty strings
+    -- are alphanumeric even if their status is
+    -- undefined
+    True
+  else do
+    let headChar = head s
+    let tailString = tail s
+    let itIsAlpha = isAlpha headChar
+    let itIsASCII = isAscii headChar
+    let curCharIsAlphaClean = itIsAlpha && itIsASCII
+    curCharIsAlphaClean && (isAlphaNumClean tailString)
 
 
 
@@ -166,8 +222,58 @@ splitToken = " :%: "
 --    design (which will be eventually fixed) if the user enters
 --    a bad passphrase, she/he will have to restart the application]
 passPhraseIsValid :: String -> Bool
-passPhraseIsValid thePassPhrase =
-  (thePassPhrase /= "")
+passPhraseIsValid thePassPhrase = do
+  let passPhraseLen = Prelude.length(thePassPhrase)
+  if passPhraseLen < 4 then
+     False
+  else if passPhraseLen > 16 then
+     False
+  else if (thePassPhrase == "") then
+     False
+  else
+     True
+     -- This isn't working just now
+     -- isAlphaNumClean thePassPhrase
+
+
+
+-- PURPOSE:
+--   To return a randomly generated alphanumeric character
+--
+-- RETURNS:
+--   A randomly generated alphanumeric character
+getAlphaNumericChar :: IO Char
+getAlphaNumericChar = do
+  offSetNum <- getStdRandom (randomR (0,(alphaNumericExtent-1)))
+  let keyVal =
+           if offSetNum >= 0 && offSetNum <= 10 then
+             48 + offSetNum
+           else if offSetNum > 10 && offSetNum <= 36 then
+             65 + (offSetNum - 11)
+           else
+             97 + (offSetNum - 37)
+  -- From [5] chr gets a character from the integer ASCII value
+  return (chr keyVal)
+
+
+
+-- PURPOSE:
+--   To create a "random" alphanumeric string of the specified length
+--
+-- len:
+--   The length of the "random" alphanumeric string to create
+--
+-- RETURNS:
+--   A "random" alphanumeric string of the specified length
+generateNewFileKey :: Int -> IO String
+generateNewFileKey len = do
+  if (len < 1) then
+    return ""
+  else do
+    nextChar <- getAlphaNumericChar
+    restOfString <- (generateNewFileKey (len -1))
+    let theString = nextChar : restOfString
+    return theString
 
 
 
@@ -196,7 +302,7 @@ getUpdatedPassPhrase curPassPhrase validationFunc message = do
     return curPassPhrase
   else do
     putStrLn message
-    let outString = "[Until I fix the padding issue, just use three alphanumeric ASCII Characters]"
+    let outString = "[4 - 16 Alphanumeric ASCII Characters]"
     putStrLn outString
     passPhrase <- getSecret
     getUpdatedPassPhrase passPhrase validationFunc message
@@ -306,6 +412,7 @@ getTotalKey inMemoryKey fromFileKey =
 showMainMenu :: IO ()
 showMainMenu = do
   putStrLn "";
+  putStrLn "i - Initialize";
   putStrLn "n - New Password Mode";
   putStrLn "g - Get Password Mode";
   putStrLn "x - Exit";
@@ -316,11 +423,35 @@ runMainMenu inMemoryDecripKey = do
   menuChoice <- getLine     -- GetChar was leaving junk at the end
   if menuChoice == "x" then
     putStrLn "Terminating"
+  else if menuChoice == "i" then do
+    putStrLn "WARNING!!! - This will erase any old data"
+    putStrLn "   You may want to backup this directory with a suitable"
+    putStrLn "   third party encryption routine before continuing..."
+    putStrLn ""
+    putStrLn "   Do you want to continue (y/n)?"
+    yesNo <- getLine
+    if yesNo == "y" then do
+       passPhrase <- getUpdatedPassPhrase
+         "" passPhraseIsValid "Enter Passphrase (4-16 alphanumeric chars):"
+       let passPhraseLen = Prelude.length(passPhrase)
+       let keyFromFileLen = cryptoKeyLength - passPhraseLen
+       fileKey <- generateNewFileKey keyFromFileLen
+       keyFileH <- openFile extraKeyFile WriteMode
+       hPutStrLn keyFileH fileKey
+       hClose keyFileH
+
+       -- erase the old PasswordFile
+       passFileH <- openFile thePasswordFile WriteMode
+       hPutStrLn passFileH ""
+       hClose passFileH
+       runMainMenu passPhrase
+    else do
+       putStrLn "aborting..."
+       runMainMenu ""
   else if menuChoice == "n" then do
     passPhrase <- getUpdatedPassPhrase
       inMemoryDecripKey passPhraseIsValid "Enter Passphrase:"
-    -- Location of extraKeyFile is hardcoded for now
-    theHandle <- openFile "extraKeyFile" ReadMode
+    theHandle <- openFile extraKeyFile ReadMode
     theLine <- hGetLine theHandle
     hClose theHandle
     let tKey = getTotalKey passPhrase theLine
@@ -341,8 +472,7 @@ runMainMenu inMemoryDecripKey = do
   else if menuChoice == "g" then do
     passPhrase <- getUpdatedPassPhrase
       inMemoryDecripKey passPhraseIsValid "Enter Passphrase:"
-    -- Location of extraKeyFile is hardcoded for now
-    theHandle <- openFile "extraKeyFile" ReadMode
+    theHandle <- openFile extraKeyFile ReadMode
     theLine <- hGetLine theHandle
     hClose theHandle
     let tKey = getTotalKey passPhrase theLine
