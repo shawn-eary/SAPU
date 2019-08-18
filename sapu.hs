@@ -132,6 +132,11 @@
 -- https://hoogle.haskell.org
 -- [Last Referenced: July 17, 2019]
 --
+-- [E] - Various
+-- Haskell Wiki
+-- https://wiki.haskell.org/Haskell
+-- [Last Referenced: August 18, 2019] 
+--
 -- REFERNCE APPOLOGY:
 -- While I would like for this to be an academic work, it is not
 -- one.  This code is written in haste because I have a day job.
@@ -370,11 +375,31 @@ splitRowFromSAPU tokenStr stringToSplit = do
   else
     (theSplit !! 0, theSplit !! 1)
 
-searchFromSAPU :: Handle -> String -> IO String
+
+
+-- PURPOSE:
+--   Takes a handle for the open password file and looks for the
+--   password identified by entryToFind
+--
+-- h:
+--   The handle of the open password file
+--
+-- entryToFind:
+--   A string containing the "description" of the password to look for
+--   in the password file
+--
+-- RETURNS:
+--   An IO action of a Maybe String
+--   If entryToFind is found in the password file, the encrypted
+--   password is returned by way of the Just constructor.  If it
+--   is not found, then the Nothing constructor is invoked
+searchFromSAPU :: Handle -> String -> IO (Maybe String)
 searchFromSAPU h entryToFind = do
   atEndOfFile <- hIsEOF(h)
   if atEndOfFile then
-    return ""
+    -- entryToFind was not found.  Use the Nothing constructor to
+    -- signal that nothing was found
+    return Nothing
   else do
     someLine <- hGetLine h
     let theSplit = splitRowFromSAPU splitToken someLine
@@ -382,16 +407,14 @@ searchFromSAPU h entryToFind = do
     let theEncryptedPass = snd(theSplit)
     let theRowOut = "**" ++ theRowDesc ++ "**"
     let entryOut = "**" ++ entryToFind ++ "**"
-    -- putStrLn theRowOut
-    -- putStrLn entryOut
     if theRowDesc == entryToFind then do
-      return theEncryptedPass
+      return (Just theEncryptedPass)
     else
       searchFromSAPU h entryToFind
 
-getPasswordFromSAPU :: String -> String -> IO String
+getPasswordFromSAPU :: String -> String -> IO (Maybe String)
 getPasswordFromSAPU totalKey passDescription = do
-  let entryToLookFor = passDescription   --  ++ ": "
+  let entryToLookFor = passDescription
   theHandle <- openFile thePasswordFile ReadMode
   theEncryptedPass <- (searchFromSAPU theHandle entryToLookFor)
   hClose theHandle
@@ -482,18 +505,22 @@ runMainMenu inMemoryDecripKey = do
     theEncryptedPass <- getPasswordFromSAPU tKey theDescription
 
     -- Converting a String to a ByteString according to [3]
-    let bEncodedEncryptedPass = UTF8.fromString theEncryptedPass
-    let bEncryptedPass = B64.decodeLenient bEncodedEncryptedPass
-    let lbsEncryptedPass = LChar8.fromStrict bEncryptedPass;
-    let decryptedPassword = decryptMsg CBC bTkey lbsEncryptedPass;
+    if isNothing theEncryptedPass then
+      putStrLn "Value Not Found"
+    else do
+      let fromJustTheEncryptedPass = fromJust theEncryptedPass
+      let bEncodedEncryptedPass = UTF8.fromString fromJustTheEncryptedPass
+      let bEncryptedPass = B64.decodeLenient bEncodedEncryptedPass
+      let lbsEncryptedPass = LChar8.fromStrict bEncryptedPass;
+      let decryptedPassword = decryptMsg CBC bTkey lbsEncryptedPass;
 
-    -- In the future, the user might be given the option to choose
-    -- whether she or he wants to print the password to the console
-    -- or copy it to the clipboard, but right now just copy it to
-    -- the clipboard
-    -- LChar8.putStrLn decryptedPassword
-    let sDecryptedPassword = lazyByteStringToString decryptedPassword
-    setClipboardString sDecryptedPassword
+      -- In the future, the user might be given the option to choose
+      -- whether she or he wants to print the password to the console
+      -- or copy it to the clipboard, but right now just copy it to
+      -- the clipboard
+      -- LChar8.putStrLn decryptedPassword
+      let sDecryptedPassword = lazyByteStringToString decryptedPassword
+      setClipboardString sDecryptedPassword
     runMainMenu passPhrase
   else
     runMainMenu inMemoryDecripKey
