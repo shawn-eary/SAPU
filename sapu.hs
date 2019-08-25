@@ -99,6 +99,14 @@
 -- December 2, 2012
 -- [Last Accessed: July 17, 2019]
 --
+-- [6] - ДМИТРИЙ МАЛИКОВ; ErikR
+-- Ambiguous type variable arising from the use of `handle`
+-- StackOverflow
+-- https://stackoverflow.com/questions/12030977/
+-- ambiguous-type-variable-arising-from-the-use-of-handle
+-- August 25, 2019
+-- [Last Accessed: August 25, 2019]
+--
 -- GENERAL REFERECES:
 -- The referneces in listed in this section were overarching and
 -- general.  They were used so frequently that it doesn't make sense to
@@ -135,7 +143,19 @@
 -- [E] - Various
 -- Haskell Wiki
 -- https://wiki.haskell.org/Haskell
--- [Last Referenced: August 18, 2019] 
+-- [Last Referenced: August 18, 2019]
+--
+-- [F] - williamyaoh; neongreen
+-- Usage Examples for redgex-tdfa
+-- https://github.com/ChrisKuklewicz/regex-tdfa/commit/
+-- d0d6b4b54f455a2145f39ce301520a05ffe5dc4e
+-- May 8, 2019
+-- [Last Referenced: August 25, 2019]
+--
+-- [G] - O'Sullivan, Bryan; Stewart, Don; Goerzen, John
+-- Real World Haskell
+-- http://book.realworldhaskell.org/read/error-handling.html
+-- [Last Referenced: August 25, 2019]
 --
 -- REFERNCE APPOLOGY:
 -- While I would like for this to be an academic work, it is not
@@ -149,16 +169,17 @@
 import Data.Char
 import Data.Maybe
 import System.IO;
-import System.Clipboard;
-import System.Console.Haskeline;
-import Data.List.Split;
-import qualified Data.ByteString.UTF8 as UTF8;
-import qualified Data.ByteString.Lazy as BL;
-import qualified Data.ByteString as BStr;
-import qualified Data.ByteString.Lazy.Char8 as LChar8;
-import qualified Data.ByteString.Base64.Lazy as B64L;
-import qualified Data.ByteString.Base64 as B64;
-import System.Random;
+import System.Clipboard
+import System.Console.Haskeline
+import Data.List.Split
+import qualified Data.ByteString.UTF8 as UTF8
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString as BStr
+import qualified Data.ByteString.Lazy.Char8 as LChar8
+import qualified Data.ByteString.Base64.Lazy as B64L
+import qualified Data.ByteString.Base64 as B64
+import System.Random
+import Text.Regex.TDFA
 
 -- I wanted to use Cryptonite but I don't understand it right now
 -- and I'm trying to get this out the door.  I will fix it later
@@ -432,13 +453,46 @@ getTotalKey :: String -> String -> String
 getTotalKey inMemoryKey fromFileKey =
   inMemoryKey ++ fromFileKey
 
+
+
+-- PURPOSE:
+--   Takes a regEx and outputs the descriptions that match the regEx
+--
+-- h:
+--   A handle to the password file
+--
+-- regEx:
+--   The regEx to look for
+--
+-- RETURNS:
+--   An IO action of that lists all of the descriptions in the password
+--   file that match regEx
+findDescriptionsFromSAPU :: Handle -> String -> IO ()
+findDescriptionsFromSAPU h regEx = do
+  atEndOfFile <- hIsEOF(h)
+  if atEndOfFile then
+    -- The end of the file was reached.  Terminate
+    putStrLn ""
+  else do
+    someLine <- hGetLine h
+    let theSplit = splitRowFromSAPU splitToken someLine
+    let theRowDesc = fst(theSplit)
+    if (theRowDesc =~ regEx) then do
+      putStrLn theRowDesc
+      findDescriptionsFromSAPU h regEx
+    else
+      findDescriptionsFromSAPU h regEx
+
+
+
 showMainMenu :: IO ()
 showMainMenu = do
   putStrLn "";
-  putStrLn "i - Initialize";
-  putStrLn "n - New Password Mode";
-  putStrLn "g - Get Password Mode";
-  putStrLn "x - Exit";
+  putStrLn "i         - Initialize";
+  putStrLn "n         - New Password Mode";
+  putStrLn "g         - Get Password Mode";
+  putStrLn "s [regEx] - Search Descriptions";
+  putStrLn "x         - Exit";
 
 runMainMenu :: String -> IO ()
 runMainMenu inMemoryDecripKey = do
@@ -522,6 +576,34 @@ runMainMenu inMemoryDecripKey = do
       let sDecryptedPassword = lazyByteStringToString decryptedPassword
       setClipboardString sDecryptedPassword
     runMainMenu passPhrase
+  else if (head menuChoice) == 's' then do
+    -- If there is a space after the 's' in the menuChoice, ignore it
+    let noS = tail menuChoice
+    let theRegEx =
+          if noS == [] then
+            -- Since the user didn't specify a RegEx, assume they
+            -- want everything
+            ".*"
+          else
+            tail noS
+    let getMatchingDescriptions = do
+         let outString =
+              "Searching for regEx = " ++ theRegEx
+         putStrLn outString
+         anotherHandle <- openFile thePasswordFile ReadMode
+         findDescriptionsFromSAPU anotherHandle theRegEx
+         hClose anotherHandle
+
+    -- Compiler yields an ambiguous type error if I don't use the
+    -- technique mentioned by ДМИТРИЙ МАЛИКОВ in [6].  Don't ask me
+    -- how to pronounce that dude's name...  You can also see [G]
+    -- for a discussion of how to handle exceptions in Haskell but
+    -- you won't necessarily see the use of "SomeException" to get
+    -- rid of the ambigous type error.
+    handle
+      (\(SomeException _) -> putStrLn "Error: Possible Bad RegEx")
+      getMatchingDescriptions
+    runMainMenu inMemoryDecripKey
   else
     runMainMenu inMemoryDecripKey
 
