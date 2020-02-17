@@ -107,6 +107,14 @@
 -- August 25, 2019
 -- [Last Accessed: August 25, 2019]
 --
+-- [7] - kennytm; Cooray, Ranhiru Jude; et al...
+-- Convert String to Integer/Float in Haskell?
+-- StackOverflow
+-- https://stackoverflow.com/questions/2468410/
+-- convert-string-to-integer-float-in-haskell
+-- March 18, 2010
+-- [Last Accessed: February 16, 2020]
+--
 -- GENERAL REFERECES:
 -- The referneces in listed in this section were overarching and
 -- general.  They were used so frequently that it doesn't make sense to
@@ -291,13 +299,13 @@ getAlphaNumericChar = do
 --
 -- RETURNS:
 --   A "random" alphanumeric string of the specified length
-generateNewFileKey :: Int -> IO String
-generateNewFileKey len = do
+generateRandAlphaNum :: Int -> IO String
+generateRandAlphaNum len = do
   if (len < 1) then
     return ""
   else do
     nextChar <- getAlphaNumericChar
-    restOfString <- (generateNewFileKey (len -1))
+    restOfString <- (generateRandAlphaNum (len -1))
     let theString = nextChar : restOfString
     return theString
 
@@ -489,10 +497,12 @@ showMainMenu :: IO ()
 showMainMenu = do
   putStrLn "";
   putStrLn "i         - Initialize";
-  putStrLn "n         - New Password Mode";
+  putStrLn "n [length]- New Password Mode";
   putStrLn "g         - Get Password Mode";
   putStrLn "s [regEx] - Search Descriptions";
   putStrLn "x         - Exit";
+  putStrLn "";
+  putStrLn "[] Brakets mean optional parameter";
 
 runMainMenu :: String -> IO ()
 runMainMenu inMemoryDecripKey = do
@@ -500,6 +510,35 @@ runMainMenu inMemoryDecripKey = do
   menuChoice <- getLine     -- GetChar was leaving junk at the end
   if menuChoice == "x" then
     putStrLn "Terminating"
+  else if (head menuChoice) == 'n' then do
+    passPhrase <- getUpdatedPassPhrase
+       inMemoryDecripKey passPhraseIsValid "Enter Passphrase:"
+
+    theHandle <- openFile extraKeyFile ReadMode
+    theLine <- hGetLine theHandle
+    hClose theHandle
+    let tKey = getTotalKey passPhrase theLine
+    putStrLn "Enter Description Identifier:"
+    theDescription <- getLine
+
+    let newArgs = (tail menuChoice)
+    sPass <- 
+       if newArgs == [] then do
+          putStrLn "Enter Password:"
+          getSecret
+       else do
+          let length = (read newArgs :: Int) -- See [7]
+          generateRandAlphaNum length           
+
+    -- You can see [3] and [4] for how to convert a string into a
+    -- Lazy ByteString
+    let blPass = stringToLazyByteString sPass
+    let bTkey = UTF8.fromString tKey
+    encryptedPassword <- encryptMsg CBC bTkey blPass
+    let encodedEncryptedPassword = B64L.encode encryptedPassword
+    let decryptedPassword = decryptMsg CBC bTkey encryptedPassword
+    writePass theDescription encodedEncryptedPassword
+    runMainMenu passPhrase
   else if menuChoice == "i" then do
     putStrLn "WARNING!!! - This will erase any old data"
     putStrLn "   You may want to backup this directory with a suitable"
@@ -512,7 +551,7 @@ runMainMenu inMemoryDecripKey = do
          "" passPhraseIsValid "Enter Passphrase (4-16 alphanumeric chars):"
        let passPhraseLen = Prelude.length(passPhrase)
        let keyFromFileLen = cryptoKeyLength - passPhraseLen
-       fileKey <- generateNewFileKey keyFromFileLen
+       fileKey <- generateRandAlphaNum keyFromFileLen
        keyFileH <- openFile extraKeyFile WriteMode
        hPutStrLn keyFileH fileKey
        hClose keyFileH
@@ -525,27 +564,6 @@ runMainMenu inMemoryDecripKey = do
     else do
        putStrLn "aborting..."
        runMainMenu ""
-  else if menuChoice == "n" then do
-    passPhrase <- getUpdatedPassPhrase
-      inMemoryDecripKey passPhraseIsValid "Enter Passphrase:"
-    theHandle <- openFile extraKeyFile ReadMode
-    theLine <- hGetLine theHandle
-    hClose theHandle
-    let tKey = getTotalKey passPhrase theLine
-    putStrLn "Enter Description Identifier:"
-    theDescription <- getLine
-    putStrLn "Enter Password:"
-    sPass <- getSecret
-
-    -- You can see [3] and [4] for how to convert a string into a
-    -- Lazy ByteString
-    let blPass = stringToLazyByteString sPass
-    let bTkey = UTF8.fromString tKey
-    encryptedPassword <- encryptMsg CBC bTkey blPass
-    let encodedEncryptedPassword = B64L.encode encryptedPassword
-    let decryptedPassword = decryptMsg CBC bTkey encryptedPassword
-    writePass theDescription encodedEncryptedPassword
-    runMainMenu passPhrase
   else if menuChoice == "g" then do
     passPhrase <- getUpdatedPassPhrase
       inMemoryDecripKey passPhraseIsValid "Enter Passphrase:"
